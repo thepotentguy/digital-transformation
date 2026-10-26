@@ -1,0 +1,41 @@
+<?php
+require '/wordpress/wp-load.php';
+$checks=array();
+function call_ecs($method,$route,$body=null,$nonce=true){$r=new WP_REST_Request($method,'/extraordinary-careers/v1'.$route);if($nonce)$r->set_header('X-WP-Nonce',wp_create_nonce('wp_rest'));if($body!==null){$r->set_header('content-type','application/json');$r->set_body(wp_json_encode($body));}return rest_do_request($r);}
+function check_ecs($name,$actual,$expected){global $checks;$checks[]=array('name'=>$name,'pass'=>$actual===$expected,'actual'=>$actual,'expected'=>$expected);}
+$admin=get_user_by('login','admin');wp_set_current_user($admin->ID);
+check_ecs('missing nonce denied',call_ecs('GET','/jobs',null,false)->get_status(),401);
+wp_set_current_user(0);check_ecs('anonymous denied',call_ecs('GET','/jobs')->get_status(),401);
+$subscriber=wp_insert_user(array('user_login'=>'ecs_subscriber','user_pass'=>wp_generate_password(),'role'=>'subscriber'));
+wp_set_current_user($subscriber);check_ecs('subscriber denied',call_ecs('GET','/jobs')->get_status(),403);
+wp_set_current_user($admin->ID);
+$draft=array('title'=>'Synthetic test vacancy','fields'=>array(),'status'=>'draft');
+$r=call_ecs('POST','/jobs',$draft);$job=$r->get_data();check_ecs('draft saved',isset($job['id']),true);
+check_ecs('draft status',$job['status']??null,'draft');
+check_ecs('managed marker',get_post_meta($job['id'],'_ecs_managed',true),'1');
+check_ecs('missing publish fields rejected',call_ecs('POST','/jobs',array_merge($draft,array('status'=>'publish')))->get_status(),400);
+check_ecs('invalid email rejected',call_ecs('POST','/jobs',array_merge($draft,array('fields'=>array('contact_email'=>'bad@'))))->get_status(),400);
+check_ecs('invalid date rejected',call_ecs('POST','/jobs',array_merge($draft,array('fields'=>array('closing_date'=>'2027-02-30'))))->get_status(),400);
+check_ecs('invalid status rejected',call_ecs('POST','/jobs',array_merge($draft,array('status'=>'trash')))->get_status(),400);
+check_ecs('invalid ID rejected',call_ecs('POST','/jobs',array_merge($draft,array('id'=>'1')))->get_status(),400);
+$fields=array('company'=>'Synthetic Company','location'=>'Local only','employment_type'=>'Full time','summary'=>'Test opportunity','responsibilities'=>"One\nTwo",'qualifications'=>'Synthetic qualification','application_email'=>'careers@example.test','closing_date'=>'2099-12-31');
+$publish=array('title'=>'Synthetic published vacancy','fields'=>$fields,'status'=>'publish','id'=>$job['id'],'modified'=>$job['modified']);
+$published=call_ecs('POST','/jobs',$publish)->get_data();check_ecs('publish status',$published['status']??null,'publish');
+$update=$publish;$update['title']='Synthetic revised vacancy';$update['modified']=$published['modified'];
+$updated=call_ecs('POST','/jobs',$update)->get_data();check_ecs('update title',$updated['title']??null,'Synthetic revised vacancy');
+$stale=$update;$stale['modified']='2000-01-01 00:00:00';check_ecs('stale update denied',call_ecs('POST','/jobs',$stale)->get_status(),409);
+unset($stale['modified']);check_ecs('missing version denied',call_ecs('POST','/jobs',$stale)->get_status(),409);
+$downgrade=$update;$downgrade['status']='draft';check_ecs('published downgrade denied',call_ecs('POST','/jobs',$downgrade)->get_status(),409);
+$plain=wp_insert_post(array('post_title'=>'Unmanaged fixture','post_status'=>'draft'));
+$unmanaged=$update;$unmanaged['id']=$plain;check_ecs('unmanaged edit denied',call_ecs('POST','/jobs',$unmanaged)->get_status(),404);
+$author=wp_insert_user(array('user_login'=>'ecs_author','user_pass'=>wp_generate_password(),'role'=>'author'));wp_set_current_user($author);
+check_ecs('author cannot edit others',call_ecs('POST','/jobs',$update)->get_status(),403);
+$jobs=call_ecs('GET','/jobs')->get_data();check_ecs('author list excludes others',count($jobs['jobs']),0);
+wp_set_current_user($admin->ID);
+$xss=$draft;$xss['title']='<script>alert(1)</script>Safe';$xss['fields']=array('summary'=>'<img src=x onerror=alert(1)>Text','application_subject'=>'" onmouseover="alert(1)','application_email'=>'careers@example.test');
+$preview=call_ecs('POST','/preview',$xss)->get_data();check_ecs('preview returns HTML',isset($preview['html']),true);check_ecs('preview no script or event attributes',preg_match('/<script|<img|\son(?:error|mouseover)=/i',$preview['html']),0);
+$savedx=call_ecs('POST','/jobs',$xss)->get_data();check_ecs('stored title sanitized',strpos($savedx['title'],'<script')===false,true);
+check_ecs('mail contained',wp_mail('nobody@example.test','test','test'),false);
+check_ecs('external HTTP contained',is_wp_error(wp_remote_get('https://example.test')),true);
+check_ecs('search indexing disabled',get_option('blog_public'),'0');
+echo wp_json_encode(array('wordpress'=>get_bloginfo('version'),'php'=>PHP_VERSION,'checks'=>$checks,'total'=>count($checks),'failed'=>count(array_filter($checks,function($c){return !$c['pass'];})),'sampleIds'=>array($job['id'],$savedx['id'])),JSON_PRETTY_PRINT);
