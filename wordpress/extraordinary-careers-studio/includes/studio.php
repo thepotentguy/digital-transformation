@@ -2,7 +2,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 function ecs_fields() {
-    return array('company','location','employment_type','summary','responsibilities','qualifications','experience','skills','systems','conditions','eligibility','benefits','application_email','contact_email','application_subject','closing_date','equity','shortlist_notice');
+    return array('company','location','employment_type','summary','responsibilities','qualifications','experience','skills','systems','conditions','eligibility','benefits','application_email','contact_email','application_subject','closing_date','equity','shortlist_notice','image_id','image_alt','online_applications');
 }
 add_action('admin_menu', function () {
     add_menu_page('Careers Studio', 'Careers Studio', 'edit_posts', 'extraordinary-careers-studio', function () {
@@ -19,6 +19,7 @@ add_action('admin_notices', function () {
 });
 add_action('admin_enqueue_scripts', function ($hook) {
     if ($hook !== 'toplevel_page_extraordinary-careers-studio') { return; }
+    if (current_user_can('upload_files')) { wp_enqueue_media(); }
     wp_enqueue_style('ecs-admin', ECS_URL . 'assets/admin.css', array(), ECS_VERSION);
     wp_enqueue_script('ecs-admin', ECS_URL . 'assets/admin.js', array(), ECS_VERSION, true);
     wp_localize_script('ecs-admin', 'ecsConfig', array('restUrl'=>esc_url_raw(rest_url('extraordinary-careers/v1/')), 'nonce'=>wp_create_nonce('wp_rest'), 'canPublish'=>current_user_can('publish_posts'), 'siteUrl'=>home_url('/'), 'frontendCss'=>ECS_URL . 'assets/frontend.css'));
@@ -45,6 +46,8 @@ function ecs_post($id) {
 }
 function ecs_item($post) {
     $fields = get_post_meta($post->ID, '_ecs_fields', true);
+    if (!is_array($fields)) { $fields = array(); }
+    $fields['image_url'] = !empty($fields['image_id']) ? (wp_get_attachment_image_url((int)$fields['image_id'], 'large') ?: '') : '';
     return array('id'=>$post->ID,'title'=>$post->post_title,'status'=>$post->post_status,'modified'=>ecs_version($post),'link'=>get_permalink($post),'fields'=>array_merge(array_fill_keys(ecs_fields(), ''), is_array($fields) ? $fields : array()));
 }
 function ecs_version($post) {
@@ -54,11 +57,24 @@ function ecs_validate($body, $publish = false) {
     if (!is_array($body) || !isset($body['title'], $body['fields']) || !is_string($body['title']) || !is_array($body['fields'])) { return new WP_Error('ecs_invalid', 'A title and fields object are required.', array('status'=>400)); }
     $fields = array_fill_keys(ecs_fields(), '');
     foreach ($body['fields'] as $key=>$value) {
+        // This display-only value is always resolved from the attachment ID.
+        if ($key === 'image_url') { continue; }
         if (!in_array($key, ecs_fields(), true) || !is_string($value)) { return new WP_Error('ecs_invalid', 'Fields must contain supported text values only.', array('status'=>400)); }
         $fields[$key] = sanitize_textarea_field($value);
     }
     foreach (array('application_email','contact_email') as $key) {
         if ($fields[$key] !== '' && !is_email($fields[$key])) { return new WP_Error('ecs_invalid_email', 'Enter a valid ' . str_replace('_', ' ', $key) . '.', array('status'=>400)); }
+    }
+    if (!in_array($fields['online_applications'], array('', '1'), true)) {
+        return new WP_Error('ecs_invalid_online', 'Online applications must be enabled or disabled.', array('status'=>400));
+    }
+    if ($fields['image_id'] !== '') {
+        if (!ctype_digit($fields['image_id']) || (int)$fields['image_id'] < 1 || !wp_attachment_is_image((int)$fields['image_id']) || !current_user_can('read_post', (int)$fields['image_id'])) {
+            return new WP_Error('ecs_invalid_image', 'Select an accessible image from the Media Library.', array('status'=>400));
+        }
+        if ($publish && trim($fields['image_alt']) === '') {
+            return new WP_Error('ecs_image_alt', 'Describe the job image before publishing.', array('status'=>400));
+        }
     }
     if ($fields['closing_date'] !== '') {
         $date = DateTime::createFromFormat('!Y-m-d', $fields['closing_date']);
@@ -78,6 +94,9 @@ function ecs_render($title, $f, $expired = false) {
     $f = array_merge(array_fill_keys(ecs_fields(), ''), $f);
     $expired = $expired || ($f['closing_date'] !== '' && $f['closing_date'] < current_time('Y-m-d'));
     $html = '<article class="ecs-career"><header class="ecs-career__header"><p class="ecs-career__eyebrow">Extraordinary careers</p><h1>' . esc_html($title) . '</h1><p class="ecs-career__meta">' . esc_html(implode(' · ', array_filter(array($f['company'],$f['location'],$f['employment_type'])))) . '</p></header><div class="ecs-career__body">';
+    if (!empty($f['image_id']) && wp_attachment_is_image((int)$f['image_id'])) {
+        $html .= '<figure class="ecs-career__image">' . wp_get_attachment_image((int)$f['image_id'], 'large', false, array('alt'=>$f['image_alt'], 'loading'=>'lazy')) . '</figure>';
+    }
     $labels = array('summary'=>'The opportunity','responsibilities'=>'Key responsibilities','qualifications'=>'Qualifications','experience'=>'Experience','skills'=>'Skills and attributes','systems'=>'Systems and tools','conditions'=>'Working conditions','eligibility'=>'Eligibility','benefits'=>'What we offer','equity'=>'Employment equity','shortlist_notice'=>'Please note');
     $lists = array('responsibilities','qualifications','experience','skills','systems','conditions','eligibility','benefits');
     foreach ($labels as $key=>$label) {
@@ -123,7 +142,23 @@ add_action('rest_api_init', function () {
         array('methods'=>'POST','permission_callback'=>'ecs_permission','callback'=>'ecs_save')
     ));
     register_rest_route($namespace, '/jobs/(?P<id>\d+)', array('methods'=>'GET','permission_callback'=>'ecs_permission','callback'=>function ($r) { $p = ecs_post((int)$r['id']); return is_wp_error($p) ? $p : ecs_item($p); }));
-    register_rest_route($namespace, '/preview', array('methods'=>'POST','permission_callback'=>'ecs_permission','callback'=>function ($r) { $data = ecs_validate($r->get_json_params()); return is_wp_error($data) ? $data : array('html'=>ecs_render($data['title'], $data['fields'])); }));
+    register_rest_route($namespace, '/preview', array('methods'=>'POST','permission_callback'=>'ecs_permission','callback'=>function ($r) {
+        $data = ecs_validate($r->get_json_params());
+        if (is_wp_error($data)) { return $data; }
+        $html = ecs_render($data['title'], $data['fields']);
+        if ($data['fields']['online_applications'] === '1') {
+            $closed = $data['fields']['closing_date'] !== '' && $data['fields']['closing_date'] < current_time('Y-m-d');
+            $ready = function_exists('ecs_cv_ready') && !is_wp_error(ecs_cv_ready());
+            $html .= '<section class="ecs-career__apply"><h2>Apply online</h2>';
+            if ($closed || !$ready) {
+                $html .= '<p>' . ($closed ? 'Online applications are closed for this role.' : 'Online applications will appear only after private storage, the privacy notice and scanning are configured.') . '</p>';
+            } else {
+                $html .= '<p>' . esc_html(ECS_CV_PRIVACY_NOTICE) . '</p><p>Applications are retained for twelve months. PDF CVs up to 5 MB.</p><fieldset disabled class="ecs-career__application-form"><legend>Form preview — no submission</legend><p><label>Full name <input type="text"></label></p><p><label>Email address <input type="email"></label></p><p><label>Phone number (optional) <input type="tel"></label></p><p><label>PDF CV <input type="file"></label></p><p><label><input type="checkbox"> I have read the privacy notice and consent to processing my application.</label></p><button type="button">Submit application</button></fieldset>';
+            }
+            $html .= '</section>';
+        }
+        return array('html'=>$html);
+    }));
 });
 
 function ecs_save($request) {
@@ -147,5 +182,10 @@ function ecs_save($request) {
     if ($id) { $args['ID'] = $id; }
     $result = wp_insert_post(wp_slash($args), true);
     if (is_wp_error($result)) { return $result; }
+    if (!empty($data['fields']['image_id'])) {
+        set_post_thumbnail($result, (int)$data['fields']['image_id']);
+    } else {
+        delete_post_thumbnail($result);
+    }
     return ecs_item(get_post($result));
 }

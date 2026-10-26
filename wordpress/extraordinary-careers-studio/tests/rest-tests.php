@@ -38,4 +38,17 @@ $savedx=call_ecs('POST','/jobs',$xss)->get_data();check_ecs('stored title saniti
 check_ecs('mail contained',wp_mail('nobody@example.test','test','test'),false);
 check_ecs('external HTTP contained',is_wp_error(wp_remote_get('https://example.test')),true);
 check_ecs('search indexing disabled',get_option('blog_public'),'0');
+$oldversion=$published['modified'];
+$same_second=$update;$same_second['modified']=$oldversion;check_ecs('changed content invalidates prior token',call_ecs('POST','/jobs',$same_second)->get_status(),409);
+$png=wp_upload_bits('synthetic-local-image.png',null,base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='));
+$attachment=wp_insert_attachment(array('post_title'=>'Synthetic image','post_mime_type'=>'image/png','post_status'=>'inherit'),$png['file']);
+$imagejob=$draft;$imagejob['fields']=array('image_id'=>(string)$attachment,'image_alt'=>'Synthetic test pixel');
+$imageresult=call_ecs('POST','/jobs',$imagejob)->get_data();check_ecs('image attachment accepted',isset($imageresult['id']),true);
+check_ecs('image appears in saved HTML',strpos(get_post($imageresult['id'])->post_content,'<img')!==false,true);
+check_ecs('image set as featured image',(int)get_post_thumbnail_id($imageresult['id']),$attachment);
+$badimage=$draft;$badimage['fields']=array('image_id'=>'999999');check_ecs('missing image ID rejected',call_ecs('POST','/jobs',$badimage)->get_status(),400);
+$textfile=wp_upload_bits('synthetic.txt',null,'Synthetic local text');$textid=wp_insert_attachment(array('post_title'=>'Not an image','post_mime_type'=>'text/plain','post_status'=>'inherit'),$textfile['file']);
+$badimage['fields']['image_id']=(string)$textid;check_ecs('non-image attachment rejected',call_ecs('POST','/jobs',$badimage)->get_status(),400);
+$noalt=array('title'=>'Synthetic image role','fields'=>array_merge($fields,array('image_id'=>(string)$attachment)),'status'=>'publish');check_ecs('publish image without alt rejected',call_ecs('POST','/jobs',$noalt)->get_status(),400);
+$noalt['fields']['image_alt']='Synthetic pixel';$r=call_ecs('POST','/jobs',$noalt)->get_data();check_ecs('publish image with alt accepted',$r['status']??null,'publish');
 echo wp_json_encode(array('wordpress'=>get_bloginfo('version'),'php'=>PHP_VERSION,'checks'=>$checks,'total'=>count($checks),'failed'=>count(array_filter($checks,function($c){return !$c['pass'];})),'sampleIds'=>array($job['id'],$savedx['id'])),JSON_PRETTY_PRINT);
