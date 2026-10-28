@@ -8,7 +8,7 @@ Campaigns depend on more than media delivery. A guest must find the right proper
 
 ## My responsibility
 
-As Digital Marketing Executive, I lead Programme Tswelopele across Marketing, Reservations, Sales and CRM. My remit includes 11 websites and content for 10 luxury properties. I mapped the full value stream and coordinated the requirements, implementation and controls around it.
+As Digital Marketing Executive, I lead Programme Tswelopele across Marketing, Reservations, Sales and CRM. My remit includes 11 websites and content for 10 luxury properties. I orchestrated the wider transformation programme: developed its strategy and phased roadmap, mapped the value stream, aligned workstreams and led CRM mapping, setup, sales automation and Reservations enablement.
 
 ```mermaid
 flowchart LR
@@ -24,8 +24,11 @@ flowchart LR
 
 The diagram is the mapped operating model. Individual workstreams have different delivery states.
 
-## What I implemented
+## Strategy, leadership and delivery
 
+- **Advertising and commercial strategy:** directed acquisition and campaign priorities and connected the customer journey with sales and reservations processes.
+- **People and adoption:** trained Reservations in new tools, systems and response processes to strengthen enquiry handling and follow-up.
+- **WhatsApp Business Agent:** introduced assistance for guest enquiries; the account showed AI active and the Clifftop guidance was saved and read back on 28 October. Formal scenario acceptance and broader property rollout remained pending.
 - **Websites and SEO:** managed property content, offers, landing pages, technical and on-page SEO, search verification and sitemap checks.
 - **Measurement:** established and standardised the GTM, GA4 and Meta browser-event layer with consent controls and native receipt checks. An October sample covered 22 WordPress pages across 11 sites; each showed one intended GA4 page view, one GTM container and the correct Meta pixel.
 - **Enquiry entry points:** directed a reusable Specials component rollout across nine installations, with eight active enquiry embeds retained.
@@ -34,9 +37,11 @@ The diagram is the mapped operating model. Individual workstreams have different
 
 ## Evidence and delivery state
 
-The website measurement checks and native event receipts establish implementation. The selected CRM enquiry and quote journeys passed an internal pilot; live guest processing remained off at that pilot checkpoint. Booking-stage tracking was investigated separately from the WordPress checks.
+The wider CRM and sales-process improvements delivered immediate operating value and contributed to increased bookings. This is a qualitative professional outcome; no numerical uplift is assigned here.
 
-A purchase event or platform revenue total needs transaction, consent, attribution and deduplication checks before it supports a financial performance claim. This case does not claim a booking uplift, causal return or reconciled ROAS.
+The website measurement checks and native event receipts establish implementation. The separate two-property enquiry and quote automation prototype passed selected internal journeys; live guest processing remained off at that prototype checkpoint. That limit does not describe the status of the whole programme or the active WhatsApp Business Agent. Booking-stage tracking was investigated separately from the WordPress checks.
+
+A purchase event or platform revenue total needs transaction, consent, attribution and deduplication checks before it supports a financial performance claim. This case does not claim a numerical booking uplift, causal return or reconciled ROAS.
 
 ## Leadership value
 
