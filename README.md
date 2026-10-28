@@ -1,6 +1,6 @@
-# Practical digital experiences
+# Marketing operations and digital transformation
 
-Selected work by **Papi / [thepotentguy](https://github.com/thepotentguy)** at the intersection of web interfaces, digital marketing and workflow automation.
+Selected work by **Papi Mashamba / [thepotentguy](https://github.com/thepotentguy)** connecting marketing leadership, customer journeys, websites, measurement and automation.
 
 This repository contains public case studies and original illustrations. Operational source, credentials, private records and client media are kept out of this showcase.
 
@@ -8,6 +8,7 @@ This repository contains public case studies and original illustrations. Operati
 
 | Project | What the work demonstrates | Evidence and limits |
 |---|---|---|
+| **[Hospitality marketing value stream](case-studies/marketing-value-stream.md)** | Programme leadership across acquisition, websites, SEO, measurement, CRM and reservations handover | Dated implementation checks; CRM pilot and revenue-reconciliation limits stated. |
 | **[Hospitality interface refresh](case-studies/hospitality-interfaces.md)** | Responsive CSS repairs, theme consistency and release packaging across five interfaces | Five package hashes and 660 member hashes checked. No checkout, payment or business-effect claim. |
 | **[Workflow reliability](case-studies/workflow-reliability.md)** | Explicit checkpoints, handling uncertain operations and verifying recovery readiness | 37 offline checks and independent review passed. A live rollback drill was not performed. |
 
