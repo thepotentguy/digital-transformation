@@ -2,8 +2,6 @@
 
 **Focus:** responsive interface maintenance, visual theming and verifiable release packaging.
 
-**Public presentation:** an anonymized case study with an original process diagram. Client names, marks, photography, operational URLs and installation packages are deliberately outside this showcase.
-
 ## The problem
 
 A legacy hospitality interface needed to support different visual identities while retaining its native controls. Responsive issues also needed focused repairs without changing the booking engine’s behavior.
